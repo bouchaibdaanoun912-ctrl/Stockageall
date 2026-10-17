@@ -1,0 +1,242 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock Chaussures</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f5f9;color:#202938;padding:16px}
+header{background:#173b70;color:white;padding:22px;border-radius:16px;margin-bottom:18px}
+h1{margin:0 0 8px;font-size:25px}
+header p{margin:0;color:#dbeafe}
+.card{background:white;padding:16px;border-radius:14px;margin-bottom:16px;box-shadow:0 2px 8px #0000000d}
+h2{font-size:19px;margin-top:0}
+label{display:block;font-weight:bold;margin:12px 0 6px}
+input,select,button{width:100%;padding:12px;border:1px solid #ccd3df;border-radius:9px;font-size:16px}
+button{border:0;background:#1764d1;color:white;font-weight:bold;margin-top:12px;cursor:pointer}
+button.delete{background:#c93636;width:auto;margin:0;padding:8px 10px}
+button.sell{background:#16834a;width:auto;margin:0;padding:8px 10px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:#edf4ff;padding:14px;border-radius:10px}
+.stat strong{display:block;font-size:24px;color:#174e9c;margin-top:6px}
+#search{margin-bottom:12px}
+.item{border:1px solid #e0e5ed;padding:12px;border-radius:10px;margin-top:10px}
+.item h3{margin:0 0 8px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.actions button{flex:1}
+.small{font-size:13px;color:#657084}
+.empty{text-align:center;color:#657084;padding:20px}
+</style>
+</head>
+<body>
+
+<header>
+<h1>👟 Stock Chaussures</h1>
+<p>Gestion du stock, pointures, couleurs et ventes</p>
+</header>
+
+<div class="card">
+<h2>📊 Résumé du stock</h2>
+<div class="stats">
+<div class="stat">Modèles<strong id="models">0</strong></div>
+<div class="stat">Paires disponibles<strong id="pairs">0</strong></div>
+</div>
+</div>
+
+<div class="card">
+<h2>➕ Ajouter au stock</h2>
+<form id="stockForm">
+<label for="model">Modèle / Référence</label>
+<input id="model" required placeholder="Ex : SPORT-001">
+
+<label for="color">Couleur</label>
+<select id="color">
+<option value="A">A</option>
+<option value="B">B</option>
+<option value="C">C</option>
+<option value="D">D</option>
+<option value="E">E</option>
+<option value="F">F</option>
+</select>
+
+<label for="size">Pointure</label>
+<select id="size">
+</select>
+
+<label for="qty">Quantité (paires)</label>
+<input id="qty" type="number" min="1" step="1" value="1" required>
+
+<label for="price">Prix unitaire (DH)</label>
+<input id="price" type="number" min="0" step="0.01" value="0" required>
+
+<button type="submit">Ajouter au stock</button>
+</form>
+</div>
+
+<div class="card">
+<h2>📦 Inventaire</h2>
+<input id="search" placeholder="🔍 Rechercher modèle, couleur, pointure...">
+<div id="inventory"></div>
+<div class="actions">
+<button type="button" id="export">Exporter CSV</button>
+<button type="button" id="clear" style="background:#6b7280">Effacer tout</button>
+</div>
+<p class="small">Les données sont conservées sur cet appareil et ce navigateur.</p>
+</div>
+
+<script>
+const sizeSelect = document.getElementById("size");
+for(let s=35;s<=48;s++){
+  const option=document.createElement("option");
+  option.value=s;
+  option.textContent=s;
+  sizeSelect.appendChild(option);
+}
+
+let stock=[];
+try{
+  stock=JSON.parse(localStorage.getItem("shoeStock")||"[]");
+  if(!Array.isArray(stock)) stock=[];
+}catch(e){stock=[];}
+
+function save(){
+  localStorage.setItem("shoeStock",JSON.stringify(stock));
+  render();
+}
+
+function render(){
+  const term=document.getElementById("search").value.toLowerCase().trim();
+  const filtered=stock.filter(x=>
+    (x.model+" "+x.color+" "+x.size).toLowerCase().includes(term)
+  );
+
+  document.getElementById("models").textContent=
+    new Set(stock.map(x=>x.model)).size;
+
+  document.getElementById("pairs").textContent=
+    stock.reduce((sum,x)=>sum+x.qty,0);
+
+  const inventory=document.getElementById("inventory");
+  inventory.innerHTML="";
+
+  if(filtered.length===0){
+    inventory.innerHTML='<div class="empty">Aucun article trouvé.</div>';
+    return;
+  }
+
+  filtered.forEach(x=>{
+    const item=document.createElement("div");
+    item.className="item";
+
+    const title=document.createElement("h3");
+    title.textContent=x.model+" — Couleur "+x.color;
+
+    const details=document.createElement("p");
+    details.textContent="Pointure : "+x.size+
+      " | Quantité : "+x.qty+
+      " paire(s) | Prix : "+Number(x.price).toFixed(2)+" DH";
+
+    const reference=document.createElement("p");
+    reference.className="small";
+    reference.textContent="Référence : "+x.id;
+
+    const actions=document.createElement("div");
+    actions.className="actions";
+
+    const sell=document.createElement("button");
+    sell.className="sell";
+    sell.textContent="Vendre 1";
+    sell.disabled=x.qty<=0;
+    sell.onclick=()=>{
+      if(x.qty>0){
+        x.qty--;
+        save();
+      }
+    };
+
+    const remove=document.createElement("button");
+    remove.className="delete";
+    remove.textContent="Supprimer";
+    remove.onclick=()=>{
+      if(confirm("Supprimer cet article ?")){
+        stock=stock.filter(a=>a.id!==x.id);
+        save();
+      }
+    };
+
+    actions.append(sell,remove);
+    item.append(title,details,reference,actions);
+    inventory.appendChild(item);
+  });
+}
+
+document.getElementById("stockForm").addEventListener("submit",e=>{
+  e.preventDefault();
+
+  const model=document.getElementById("model").value.trim();
+  const color=document.getElementById("color").value;
+  const size=Number(document.getElementById("size").value);
+  const qty=Number(document.getElementById("qty").value);
+  const price=Number(document.getElementById("price").value);
+
+  if(!model||!Number.isInteger(qty)||qty<1||price<0){
+    alert("Vérifiez les informations saisies.");
+    return;
+  }
+
+  const existing=stock.find(x=>
+    x.model.toLowerCase()===model.toLowerCase()&&
+    x.color===color&&x.size===size&&x.price===price
+  );
+
+  if(existing){
+    existing.qty+=qty;
+  }else{
+    stock.push({
+      id:Date.now().toString(),
+      model,color,size,qty,price
+    });
+  }
+
+  save();
+  e.target.reset();
+  document.getElementById("qty").value=1;
+  document.getElementById("price").value=0;
+  alert("Article ajouté avec succès !");
+});
+
+document.getElementById("search").addEventListener("input",render);
+
+document.getElementById("clear").addEventListener("click",()=>{
+  if(confirm("Attention : supprimer tout le stock ?")){
+    stock=[];
+    save();
+  }
+});
+
+document.getElementById("export").addEventListener("click",()=>{
+  const rows=[
+    ["Reference","Modele","Couleur","Pointure","Quantite","Prix DH"],
+    ...stock.map(x=>[x.id,x.model,x.color,x.size,x.qty,x.price])
+  ];
+  const csv=rows.map(row=>row.map(v=>
+    '"'+String(v).replace(/"/g,'""')+'"'
+  ).join(";")).join("\r\n");
+
+  const blob=new Blob(["\uFEFF"+csv],{
+    type:"text/csv;charset=utf-8;"
+  });
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="stock-chaussures.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+render();
+</script>
+</body>
+</html>
